@@ -1,6 +1,9 @@
+import time
+
 import numpy as np
 import torch
 from torchvision.utils import make_grid
+
 from base import BaseTrainer
 
 
@@ -25,7 +28,7 @@ class Trainer(BaseTrainer):
         acc_metrics = np.zeros(len(self.metrics))
         for i, metric in enumerate(self.metrics):
             acc_metrics[i] += metric(output, target)
-            self.writer.add_scalar(f'{metric.__name__}', acc_metrics[i])
+            self.writer.add_scalar(metric.__name__, acc_metrics[i])
         return acc_metrics
 
     def _train_epoch(self, epoch):
@@ -45,17 +48,21 @@ class Trainer(BaseTrainer):
             The metrics in log must have the key 'metrics'.
         """
         self.model.train()
-    
+
         total_loss = 0
         total_metrics = np.zeros(len(self.metrics))
+        time_iter_start = time.time()
         for batch_idx, (data, target) in enumerate(self.data_loader):
             data, target = data.to(self.device), target.to(self.device)
 
+            time_data_process = time.time() - time_iter_start
             self.optimizer.zero_grad()
             output = self.model(data)
             loss = self.loss(output, target)
             loss.backward()
             self.optimizer.step()
+            time_iter_passed = time.time() - time_iter_start
+            data_time = time_data_process / time_iter_passed
 
             self.writer.set_step((epoch - 1) * len(self.data_loader) + batch_idx)
             self.writer.add_scalar('loss', loss.item())
@@ -63,13 +70,16 @@ class Trainer(BaseTrainer):
             total_metrics += self._eval_metrics(output, target)
 
             if self.verbosity >= 2 and batch_idx % self.log_step == 0:
-                self.logger.info('Train Epoch: {} [{}/{} ({:.0f}%)] Loss: {:.6f}'.format(
+                self.logger.info('Train Epoch: {} [{}/{} ({:.0f}%)] Data_time: {:.2f}, Loss: {:.6f}'.format(
                     epoch,
                     batch_idx * self.data_loader.batch_size,
                     self.data_loader.n_samples,
                     100.0 * batch_idx / len(self.data_loader),
+                    data_time,
                     loss.item()))
                 self.writer.add_image('input', make_grid(data.cpu(), nrow=8, normalize=True))
+
+            time_iter_start = time.time()
 
         log = {
             'loss': total_loss / len(self.data_loader),

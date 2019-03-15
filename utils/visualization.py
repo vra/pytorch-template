@@ -8,7 +8,7 @@ class WriterTensorboardX():
             log_path = writer_dir
             try:
                 self.writer = importlib.import_module('tensorboardX').SummaryWriter(log_path)
-            except ModuleNotFoundError:
+            except:
                 message = "Warning: TensorboardX visualization is configured to use, but currently not installed on this machine. " + \
                           "Please install the package by 'pip install tensorboardx' command or turn off the option in the 'config.json' file."
                 logger.warning(message)
@@ -30,6 +30,7 @@ class WriterTensorboardX():
         """
         if name in self.tensorboard_writer_ftns:
             add_data = getattr(self.writer, name, None)
+
             def wrapper(tag, data, *args, **kwargs):
                 if add_data is not None:
                     add_data('{}/{}'.format(self.mode, tag), data, self.step, *args, **kwargs)
